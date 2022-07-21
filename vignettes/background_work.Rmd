@@ -126,12 +126,14 @@ Following the same method as for AR(1) errors.
 
 Set p = 2,
 
+$$
 \begin{matrix} V_2^{-1} = 
 \end{matrix}
 \begin{bmatrix}
 (1-\phi_2^2) & -(\phi_1 + \phi_1\phi_2) \\
 -(\phi_1 + \phi_1\phi_2) & (1-\phi_2^2)  \\
 \end{bmatrix}
+$$
 
 $\left|V_2^{-1}\right| = (1+\phi_2^2)\left[(1-\phi_2)^2 -\phi_1^2 \right]$
 

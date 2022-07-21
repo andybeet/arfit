@@ -1,0 +1,242 @@
+---
+title: "Short Term Trends for SOE inclusion"
+date: "7/5/2022"
+output: html_document
+---
+
+
+## Trend Comparison
+
+1) `geom_gls()` added into arfit package. 
+2) Code for making time filtered data `line 54`
+3) Code for adding draft lm into plot `line 75`
+4) To Do - replace plotting codes lines above with work from this package. 
+
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+library(tidyverse)
+library(ecodata)
+```
+
+```{r,warning=FALSE, message=FALSE, echo=FALSE,  code = readLines("https://raw.githubusercontent.com/NOAA-EDAB/ecodata/master/chunk-scripts/human_dimensions_NE.Rmd-setup.R")}
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE, code = readLines("https://raw.githubusercontent.com/NOAA-EDAB/ecodata/master/chunk-scripts/human_dimensions_NE.Rmd-GIS-setup.R")}
+```
+
+### Forced LM 
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+apex<-ecodata::hms_landings %>%
+  dplyr::filter(stringr::str_detect(Var, "Revenue"),
+                Time<2020) %>%
+  tidyr::separate(Var, c("Var", "trash"), sep = "_") %>%
+  dplyr::group_by(Time) %>%
+  dplyr::summarise(Value = sum(Value)) %>% 
+  dplyr::mutate(Var = c("HMS Revenue"),
+         Units = c("metric tons"),
+         EPU = c("MAB"))
+  
+#Filtering and aggregation step
+rev_agg <- ecodata::comdat %>%
+  dplyr::filter(stringr::str_detect(Var, "Revenue"),
+         !stringr::str_detect(Var, "Apex|prop|Other|NEFMC"), #Remove proportions, "Other" category species, NEFMC managed species in MAB
+         EPU == "MAB",
+         Time >= 1986) %>%
+  rbind(apex) %>%
+  dplyr::mutate(Status = ifelse(str_detect(Var, "managed"),
+                         "Managed","Total")) %>% #Create groups for aggregation
+  dplyr::group_by(Status, Time) %>%
+  dplyr::summarise(Total = sum(Value)) %>%
+  dplyr::group_by(Status) %>%
+  dplyr::mutate(hline = mean(Total))
+
+series.col <- c("indianred","black")
+
+short_rev <- rev_agg %>%
+  filter(Time %in% (2010:2021),
+         Status == "Total")
+
+
+#Plotting
+ggplot2::ggplot(data = rev_agg) +
+
+  #Highlight last ten years
+  ggplot2::annotate("rect", fill = shade.fill, alpha = shade.alpha,
+      xmin = x.shade.min , xmax = x.shade.max,
+      ymin = -Inf, ymax = Inf)+
+
+  #lines
+  arfit::geom_gls(aes(x = Time, y = Total,
+               group = Status),
+             alpha = trend.alpha, size = trend.size) +
+  ggplot2::geom_line(aes(x = Time, y = Total, color = Status), size = lwd) +
+  ggplot2::geom_point(aes(x = Time, y = Total, color = Status), size = 1.5) +
+
+  ##########################################################################
+  ################## NEW TREND LINE ########################################
+
+  ggplot2::geom_smooth(data =short_rev, aes( x = Time, y = Total), method = "lm")+
+
+
+  ##########################################################################
+
+  #axes
+  ggplot2::scale_y_continuous(labels = function(l){trans = l / 1000000})+
+  ggplot2::scale_x_continuous(breaks = seq(1985, 2015, by = 5), expand = c(0.01, 0.01)) +
+      scale_color_manual(values = series.col, aesthetics = "color")+
+  ggplot2::guides(color = FALSE) +
+  ggplot2::ggtitle("Total Commercial Revenue *No New Data") +
+  ggplot2::ylab(expression("Revenue (10"^6*"USD)")) +
+  ggplot2::geom_hline(aes(yintercept = hline,
+               color = Status),
+           size = hline.size,
+           alpha = hline.alpha,
+           linetype = hline.lty) +
+  ggplot2::xlab(element_blank())+
+  ecodata::theme_ts()+
+  ecodata::theme_title()
+
+```
+
+### arfit::geom_lm() 
+
+1) if p-value >0.5 removed for now to see if it works
+2) To Do - edit StatLM, add pvalue if back in
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+apex<-ecodata::hms_landings %>% 
+  dplyr::filter(stringr::str_detect(Var, "Revenue"), 
+                Time<2020) %>% 
+  separate(Var, c("Var", "trash"), sep = "_") %>% 
+  group_by(Time) %>% 
+  summarise(Value = sum(Value)) %>% 
+  mutate(Var = c("HMS Revenue"), 
+         Units = c("metric tons"), 
+         EPU = c("MAB"))
+#Filtering and aggregation step
+rev_agg <- ecodata::comdat %>% 
+  dplyr::filter(stringr::str_detect(Var, "Revenue"),
+         !stringr::str_detect(Var, "Apex|prop|Other|NEFMC"), #Remove proportions, "Other" category species, NEFMC managed species in MAB
+         EPU == "MAB",
+         Time >= 1986) %>% 
+  rbind(apex) %>% 
+  dplyr::mutate(Status = ifelse(str_detect(Var, "managed"), 
+                         "Managed","Total")) %>% #Create groups for aggregation
+  dplyr::group_by(Status, Time) %>% 
+  dplyr::summarise(Total = sum(Value)) %>% 
+  dplyr::group_by(Status) %>% 
+  dplyr::mutate(hline = mean(Total))
+
+series.col <- c("indianred","black")
+
+short_rev <- rev_agg %>% 
+  filter(Time %in% (2010:2021))
+
+
+#Plotting
+ggplot2::ggplot(data = rev_agg) +
+  
+  #Highlight last ten years
+  ggplot2::annotate("rect", fill = shade.fill, alpha = shade.alpha,
+      xmin = x.shade.min , xmax = x.shade.max,
+      ymin = -Inf, ymax = Inf)+  
+  
+  #lines
+  arfit::geom_gls(aes(x = Time, y = Total,
+               group = Status),
+             alpha = trend.alpha, size = trend.size) +
+  ggplot2::geom_line(aes(x = Time, y = Total, color = Status), size = lwd) +
+  ggplot2::geom_point(aes(x = Time, y = Total, color = Status), size = 1.5) +
+  
+  ##########################################################################
+  ################## NEW TREND LINE ########################################
+
+  #ggplot2::geom_smooth(data =short_rev, aes( x = Time, y = Total), method = "lm")+
+  arfit::geom_lm(aes(x = Time, y = Total, group = Status), n = 16)+
+  
+  ##########################################################################
+  
+  #axes
+  ggplot2::scale_y_continuous(labels = function(l){trans = l / 1000000})+
+  ggplot2::scale_x_continuous(breaks = seq(1985, 2015, by = 5), expand = c(0.01, 0.01)) +
+      scale_color_manual(values = series.col, aesthetics = "color")+
+  ggplot2::guides(color = FALSE) +
+  ggplot2::ggtitle("Total Commercial Revenue *No New Data") +
+  ggplot2::ylab(expression("Revenue (10"^6*"USD)")) +
+  ggplot2::geom_hline(aes(yintercept = hline,
+               color = Status),
+           size = hline.size,
+           alpha = hline.alpha,
+           linetype = hline.lty) +
+  ggplot2::xlab(element_blank())+
+  ecodata::theme_ts()+
+  ecodata::theme_title()
+
+
+```
+
+### Testing N variations
+
+#### N = 10 = No Trend
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+lt_sst <- ecodata::long_term_sst %>% 
+  dplyr::mutate(hline = mean(Value, na.rm = TRUE))
+
+hline <- mean(lt_sst$Value)
+
+lt_sst %>% 
+  ggplot2::ggplot(aes(x = Time, y = Value, group = Var)) +
+  ggplot2::annotate("rect", fill = shade.fill, alpha = shade.alpha,
+      xmin = x.shade.min , xmax = x.shade.max,
+      ymin = -Inf, ymax = Inf) +
+  arfit::geom_gls() +
+  arfit::geom_lm(aes(x = Time, y = Value, group = Var), n= 10)+
+  ggplot2::geom_line() +
+  ggplot2::geom_point() +
+  ggplot2::geom_hline(aes(yintercept = hline),
+             size = hline.size,
+             alpha = hline.alpha,
+           linetype = hline.lty)+
+  ggplot2::ylab("Temperature (C)") +
+  ggplot2::xlab(element_blank())+
+  ggplot2::ggtitle("Long-term SST") +
+  ggplot2::scale_x_continuous(expand = c(0.01, 0.01), breaks = seq(1840,2010,10))+
+  ecodata::theme_facet() +
+  ggplot2::theme(strip.text=element_text(hjust=0,
+                                face = "italic"))+
+  ecodata::theme_title()
+```
+
+
+#### N = 30 = Possible Trend expected
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+lt_sst <- ecodata::long_term_sst %>% 
+  dplyr::mutate(hline = mean(Value, na.rm = TRUE))
+
+hline <- mean(lt_sst$Value)
+
+lt_sst %>% 
+  ggplot2::ggplot(aes(x = Time, y = Value, group = Var)) +
+  ggplot2::annotate("rect", fill = shade.fill, alpha = shade.alpha,
+      xmin = x.shade.min , xmax = x.shade.max,
+      ymin = -Inf, ymax = Inf) +
+  arfit::geom_gls() +
+  arfit::geom_lm(aes(x = Time, y = Value, group = Var), n= 30)+
+  ggplot2::geom_line() +
+  ggplot2::geom_point() +
+  ggplot2::geom_hline(aes(yintercept = hline),
+             size = hline.size,
+             alpha = hline.alpha,
+           linetype = hline.lty)+
+  ggplot2::ylab("Temperature (C)") +
+  ggplot2::xlab(element_blank())+
+  ggplot2::ggtitle("Long-term SST") +
+  ggplot2::scale_x_continuous(expand = c(0.01, 0.01), breaks = seq(1840,2010,10))+
+  ecodata::theme_facet() +
+  ggplot2::theme(strip.text=element_text(hjust=0,
+                                face = "italic"))+
+  ecodata::theme_title()
+```
